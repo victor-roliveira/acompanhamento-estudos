@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Select } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useStudyLogs } from "@/hooks/useStudyLogs";
@@ -101,7 +102,17 @@ export function DashboardPage() {
   const { user } = useAuth();
   const { logs } = useStudyLogs(user?.id);
   const [filter, setFilter] = useState<DashboardFilter>("general");
-  const summary = useDashboard(logs, filter);
+  const [subjectId, setSubjectId] = useState("");
+  const subjectOptions = useMemo(() => {
+    const subjects = logs.reduce<Record<string, string>>((acc, log) => {
+      acc[log.subject_id] = log.subject?.name ?? "Sem matéria";
+      return acc;
+    }, {});
+    return Object.entries(subjects)
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [logs]);
+  const summary = useDashboard(logs, filter, subjectId || undefined);
 
   return (
     <div className="space-y-5">
@@ -124,6 +135,22 @@ export function DashboardPage() {
           </Button>
         ))}
       </div>
+
+      <Card>
+        <CardContent className="p-4">
+          <label className="mb-2 block text-sm font-semibold" htmlFor="subjectFilter">
+            Filtrar por matéria
+          </label>
+          <Select id="subjectFilter" value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
+            <option value="">Todas as matérias</option>
+            {subjectOptions.map((subject) => (
+              <option key={subject.id} value={subject.id}>
+                {subject.name}
+              </option>
+            ))}
+          </Select>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard label="Questões" value={summary.totalQuestions} icon={Award} tone="accent" />

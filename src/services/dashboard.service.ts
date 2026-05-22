@@ -5,16 +5,17 @@ function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-function filterLogs(logs: DailyStudyLog[], filter: DashboardFilter) {
-  if (filter === "general") return logs;
+function filterLogs(logs: DailyStudyLog[], filter: DashboardFilter, subjectId?: string) {
+  const bySubject = subjectId ? logs.filter((log) => log.subject_id === subjectId) : logs;
+  if (filter === "general") return bySubject;
   const today = startOfDay(new Date());
   const start = new Date(today);
   if (filter === "daily") {
-    return logs.filter((log) => log.study_date === toIsoDate(today));
+    return bySubject.filter((log) => log.study_date === toIsoDate(today));
   }
   if (filter === "weekly") start.setDate(today.getDate() - 6);
   if (filter === "monthly") start.setMonth(today.getMonth() - 1);
-  return logs.filter((log) => parseIsoDate(log.study_date) >= start);
+  return bySubject.filter((log) => parseIsoDate(log.study_date) >= start);
 }
 
 function groupRanking(logs: DailyStudyLog[], getLabel: (log: DailyStudyLog) => string): RankingItem[] {
@@ -68,8 +69,8 @@ function buildSubjectTrailEvolution(logs: DailyStudyLog[]): SubjectTrailEvolutio
 }
 
 export const dashboardService = {
-  summarize(logs: DailyStudyLog[], filter: DashboardFilter): DashboardSummary {
-    const scoped = filterLogs(logs, filter);
+  summarize(logs: DailyStudyLog[], filter: DashboardFilter, subjectId?: string): DashboardSummary {
+    const scoped = filterLogs(logs, filter, subjectId);
     const totalQuestions = scoped.reduce((sum, log) => sum + log.total_questions, 0);
     const correctQuestions = scoped.reduce((sum, log) => sum + log.correct_questions, 0);
     const wrongQuestions = scoped.reduce((sum, log) => sum + log.wrong_questions, 0);

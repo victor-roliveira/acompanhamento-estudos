@@ -125,11 +125,6 @@ function hydratePlanItem(db: LocalDb, item: WeeklyPlanItem): WeeklyPlanItem {
   };
 }
 
-function itemWasCreatedInRange(item: WeeklyPlanItem, weekStart: string, weekEnd: string) {
-  const createdDate = toIsoDate(new Date(item.created_at));
-  return createdDate >= weekStart && createdDate <= weekEnd;
-}
-
 export const localDb = {
   demoUser: { id: DEMO_USER_ID, email: "demo@local.dev" },
 
@@ -160,13 +155,21 @@ export const localDb = {
   },
 
   listWeeklyPlanItems(userId: string, weekStart: string, weekEnd: string) {
-    this.getOrCreateWeeklyPlan(userId, weekStart, weekEnd);
+    const plan = this.getOrCreateWeeklyPlan(userId, weekStart, weekEnd);
+    const db = readDb();
+    return db.weeklyPlanItems
+      .filter((item) => item.weekly_plan_id === plan.id)
+      .map((item) => hydratePlanItem(db, item))
+      .sort((a, b) => a.trail_number - b.trail_number);
+  },
+
+  listAllWeeklyPlanItems(userId: string) {
     const db = readDb();
     const userPlanIds = new Set(db.weeklyPlans.filter((plan) => plan.user_id === userId).map((plan) => plan.id));
     return db.weeklyPlanItems
-      .filter((item) => userPlanIds.has(item.weekly_plan_id) && itemWasCreatedInRange(item, weekStart, weekEnd))
+      .filter((item) => userPlanIds.has(item.weekly_plan_id))
       .map((item) => hydratePlanItem(db, item))
-      .sort((a, b) => a.trail_number - b.trail_number);
+      .sort((a, b) => a.trail_number - b.trail_number || (a.subject?.name ?? "").localeCompare(b.subject?.name ?? ""));
   },
 
   addWeeklyPlanItem(userId: string, weekStart: string, weekEnd: string, subjectName: string, trailNumber: number, topics: string[]) {
@@ -196,13 +199,12 @@ export const localDb = {
 
   listPending(userId: string): PendingWeek[] {
     const db = readDb();
-    const userPlanIds = new Set(db.weeklyPlans.filter((plan) => plan.user_id === userId).map((plan) => plan.id));
     return db.weeklyPlans
       .filter((plan) => plan.user_id === userId)
       .map((plan) => ({
         plan,
         items: db.weeklyPlanItems
-          .filter((item) => userPlanIds.has(item.weekly_plan_id) && itemWasCreatedInRange(item, plan.week_start, plan.week_end) && !item.studied)
+          .filter((item) => item.weekly_plan_id === plan.id && !item.studied)
           .map((item) => hydratePlanItem(db, item))
           .sort((a, b) => a.trail_number - b.trail_number),
       }))

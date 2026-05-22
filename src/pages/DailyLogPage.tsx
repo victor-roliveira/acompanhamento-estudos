@@ -22,6 +22,11 @@ function splitTopics(value: string) {
     .filter(Boolean);
 }
 
+function parseNumberField(value: string) {
+  if (value.trim() === "") return Number.NaN;
+  return Number(value);
+}
+
 export function DailyLogPage() {
   const { user } = useAuth();
   const { subjects, refresh: refreshSubjects } = useSubjects(user?.id);
@@ -29,37 +34,52 @@ export function DailyLogPage() {
   const { isSubmitting, error, setError, run } = useAsyncAction();
   const [studyDate, setStudyDate] = useState(today);
   const [subjectId, setSubjectId] = useState("");
-  const [trailNumber, setTrailNumber] = useState(0);
+  const [trailNumber, setTrailNumber] = useState("");
   const [topics, setTopics] = useState("");
-  const [totalQuestions, setTotalQuestions] = useState(0);
-  const [correctQuestions, setCorrectQuestions] = useState(0);
-  const [wrongQuestions, setWrongQuestions] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState("");
+  const [correctQuestions, setCorrectQuestions] = useState("");
+  const [wrongQuestions, setWrongQuestions] = useState("");
   const [notes, setNotes] = useState("");
-  const expectedTotal = correctQuestions + wrongQuestions;
-  const accuracy = calculateAccuracy(correctQuestions, totalQuestions);
+  const parsedTotal = Number(totalQuestions || 0);
+  const parsedCorrect = Number(correctQuestions || 0);
+  const parsedWrong = Number(wrongQuestions || 0);
+  const expectedTotal = parsedCorrect + parsedWrong;
+  const accuracy = calculateAccuracy(parsedCorrect, parsedTotal);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (totalQuestions !== expectedTotal) {
+    const numericTrail = parseNumberField(trailNumber);
+    const numericTotal = parseNumberField(totalQuestions);
+    const numericCorrect = parseNumberField(correctQuestions);
+    const numericWrong = parseNumberField(wrongQuestions);
+
+    if ([numericTrail, numericTotal, numericCorrect, numericWrong].some(Number.isNaN)) {
+      setError("Preencha trilha, total, certas e erradas.");
+      return;
+    }
+
+    if (numericTotal !== numericCorrect + numericWrong) {
       setError("O total de questões deve ser igual a certas + erradas.");
       return;
     }
+
     await run(async () => {
       await logs.createLog({
         subject_id: subjectId,
-        trail_number: trailNumber,
+        trail_number: numericTrail,
         topics: splitTopics(topics),
         study_date: studyDate,
-        total_questions: totalQuestions,
-        correct_questions: correctQuestions,
-        wrong_questions: wrongQuestions,
+        total_questions: numericTotal,
+        correct_questions: numericCorrect,
+        wrong_questions: numericWrong,
         notes,
       });
       await refreshSubjects();
+      setTrailNumber("");
       setTopics("");
-      setTotalQuestions(0);
-      setCorrectQuestions(0);
-      setWrongQuestions(0);
+      setTotalQuestions("");
+      setCorrectQuestions("");
+      setWrongQuestions("");
       setNotes("");
     });
   }
@@ -85,7 +105,7 @@ export function DailyLogPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="trailNumber">Trilha</Label>
-                <Input id="trailNumber" type="number" min={0} value={trailNumber} onChange={(event) => setTrailNumber(Number(event.target.value))} />
+                <Input id="trailNumber" type="number" min={0} value={trailNumber} onChange={(event) => setTrailNumber(event.target.value)} placeholder="00" />
               </div>
             </div>
 
@@ -109,15 +129,15 @@ export function DailyLogPage() {
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="totalQuestions">Total</Label>
-                <Input id="totalQuestions" type="number" min={0} value={totalQuestions} onChange={(event) => setTotalQuestions(Number(event.target.value))} />
+                <Input id="totalQuestions" type="number" min={0} value={totalQuestions} onChange={(event) => setTotalQuestions(event.target.value)} placeholder="0" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="correctQuestions">Certas</Label>
-                <Input id="correctQuestions" type="number" min={0} value={correctQuestions} onChange={(event) => setCorrectQuestions(Number(event.target.value))} />
+                <Input id="correctQuestions" type="number" min={0} value={correctQuestions} onChange={(event) => setCorrectQuestions(event.target.value)} placeholder="0" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="wrongQuestions">Erradas</Label>
-                <Input id="wrongQuestions" type="number" min={0} value={wrongQuestions} onChange={(event) => setWrongQuestions(Number(event.target.value))} />
+                <Input id="wrongQuestions" type="number" min={0} value={wrongQuestions} onChange={(event) => setWrongQuestions(event.target.value)} placeholder="0" />
               </div>
             </div>
 

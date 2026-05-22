@@ -5,6 +5,7 @@ import { DailyLogPage } from "@/pages/DailyLogPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PendingPage } from "@/pages/PendingPage";
+import { TrailsPage } from "@/pages/TrailsPage";
 import { WeeklyPlanPage } from "@/pages/WeeklyPlanPage";
 
 export function App() {
@@ -15,6 +16,7 @@ export function App() {
         <Route element={<AppShell />}>
           <Route path="/planejamento" element={<WeeklyPlanPage />} />
           <Route path="/diario" element={<DailyLogPage />} />
+          <Route path="/trilhas" element={<TrailsPage />} />
           <Route path="/pendencias" element={<PendingPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
         </Route>

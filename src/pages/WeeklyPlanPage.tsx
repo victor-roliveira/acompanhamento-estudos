@@ -1,5 +1,5 @@
-import { FormEvent, useMemo, useState } from "react";
-import { CheckCircle2, ListPlus, Route } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Info, ListPlus, Route } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useAuth } from "@/hooks/useAuth";
 import { useWeeklyPlan } from "@/hooks/useWeeklyPlan";
@@ -19,24 +20,56 @@ function splitTopics(value: string) {
     .filter(Boolean);
 }
 
+const SELECTED_WEEK_STORAGE_KEY = "study-control-selected-week";
+
+function getInitialWeek() {
+  const fallback = getCurrentWeekRange();
+  const stored = localStorage.getItem(SELECTED_WEEK_STORAGE_KEY);
+  if (!stored) return fallback;
+
+  try {
+    const parsed = JSON.parse(stored) as { weekStart?: string; weekEnd?: string };
+    return parsed.weekStart && parsed.weekEnd ? { weekStart: parsed.weekStart, weekEnd: parsed.weekEnd } : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function parseNumberField(value: string) {
+  if (value.trim() === "") return Number.NaN;
+  return Number(value);
+}
+
 export function WeeklyPlanPage() {
   const { user } = useAuth();
-  const defaultWeek = useMemo(() => getCurrentWeekRange(), []);
+  const defaultWeek = useMemo(() => getInitialWeek(), []);
   const [weekStart, setWeekStart] = useState(defaultWeek.weekStart);
   const [weekEnd, setWeekEnd] = useState(defaultWeek.weekEnd);
   const [subjectName, setSubjectName] = useState("");
-  const [trailNumber, setTrailNumber] = useState(0);
+  const [trailNumber, setTrailNumber] = useState("");
   const [topics, setTopics] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
   const plan = useWeeklyPlan(user?.id, weekStart, weekEnd);
-  const { isSubmitting, error, run } = useAsyncAction();
+  const { isSubmitting, error, setError, run } = useAsyncAction();
+
+  useEffect(() => {
+    localStorage.setItem(SELECTED_WEEK_STORAGE_KEY, JSON.stringify({ weekStart, weekEnd }));
+  }, [weekEnd, weekStart]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    const parsedTrailNumber = parseNumberField(trailNumber);
+    if (Number.isNaN(parsedTrailNumber)) {
+      setError("Informe o número da trilha.");
+      return;
+    }
+
     await run(async () => {
-      await plan.addItem({ subjectName, trail_number: trailNumber, topics: splitTopics(topics) });
+      await plan.addItem({ subjectName, trail_number: parsedTrailNumber, topics: splitTopics(topics) });
       setSubjectName("");
-      setTrailNumber(0);
+      setTrailNumber("");
       setTopics("");
+      setFeedback("Matéria adicionada na semana selecionada.");
     });
   }
 
@@ -81,17 +114,25 @@ export function WeeklyPlanPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="trail">Número da trilha</Label>
-              <Input id="trail" value={trailNumber} onChange={(event) => setTrailNumber(Number(event.target.value))} type="number" min={0} />
+              <Input id="trail" value={trailNumber} onChange={(event) => setTrailNumber(event.target.value)} type="number" min={0} placeholder="00" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="topics">Assuntos</Label>
               <Textarea id="topics" value={topics} onChange={(event) => setTopics(event.target.value)} placeholder="Atos administrativos, poderes, agentes" />
             </div>
+            {feedback && (
+              <p className="flex items-center gap-2 rounded-md bg-success p-3 text-sm font-semibold text-white">
+                <Info className="h-4 w-4" />
+                {feedback}
+              </p>
+            )}
             {error && <p className="rounded-md bg-destructive p-3 text-sm font-semibold text-destructive-foreground">{error}</p>}
-            <Button className="w-full" disabled={isSubmitting}>
-              <ListPlus className="h-5 w-5" />
-              Adicionar na semana
-            </Button>
+            <Tooltip label="Adiciona a matéria exatamente na semana de referência selecionada acima.">
+              <Button className="w-full" disabled={isSubmitting}>
+                <ListPlus className="h-5 w-5" />
+                Adicionar na semana
+              </Button>
+            </Tooltip>
           </form>
         </CardContent>
       </Card>
@@ -118,10 +159,12 @@ export function WeeklyPlanPage() {
                     <Badge variant={item.studied ? "success" : "muted"}>{item.studied ? "Estudada" : "Não estudada"}</Badge>
                   </div>
                 </div>
-                <Button variant={item.studied ? "secondary" : "outline"} size="sm" onClick={() => plan.setStudied(item.id, !item.studied)}>
-                  <CheckCircle2 className="h-4 w-4" />
-                  {item.studied ? "Reabrir" : "Concluir"}
-                </Button>
+                <Tooltip label={item.studied ? "Marca a matéria como não estudada novamente." : "Marca a matéria como estudada nesta semana."} className="w-auto">
+                  <Button variant={item.studied ? "secondary" : "outline"} size="sm" onClick={() => plan.setStudied(item.id, !item.studied)}>
+                    <CheckCircle2 className="h-4 w-4" />
+                    {item.studied ? "Reabrir" : "Concluir"}
+                  </Button>
+                </Tooltip>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">{item.topics.join(", ")}</p>
             </CardContent>
