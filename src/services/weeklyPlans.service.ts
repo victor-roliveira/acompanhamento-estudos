@@ -3,6 +3,23 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { subjectsService } from "@/services/subjects.service";
 import type { PendingWeek, WeeklyPlan, WeeklyPlanItem, WeeklyPlanItemInput } from "@/types/study";
 
+const BRAZIL_OFFSET = "-03:00";
+
+function rangeStart(value: string) {
+  return `${value}T00:00:00.000${BRAZIL_OFFSET}`;
+}
+
+function rangeEnd(value: string) {
+  return `${value}T23:59:59.999${BRAZIL_OFFSET}`;
+}
+
+async function listUserPlanIds(userId: string) {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("weekly_plans").select("id").eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((plan) => plan.id);
+}
+
 async function getOrCreatePlan(userId: string, weekStart: string, weekEnd: string): Promise<WeeklyPlan> {
   if (!isSupabaseConfigured || !supabase) return localDb.getOrCreateWeeklyPlan(userId, weekStart, weekEnd);
 
@@ -20,11 +37,15 @@ export const weeklyPlansService = {
 
   async listItems(userId: string, weekStart: string, weekEnd: string): Promise<WeeklyPlanItem[]> {
     if (!isSupabaseConfigured || !supabase) return localDb.listWeeklyPlanItems(userId, weekStart, weekEnd);
-    const plan = await getOrCreatePlan(userId, weekStart, weekEnd);
+    await getOrCreatePlan(userId, weekStart, weekEnd);
+    const planIds = await listUserPlanIds(userId);
+    if (planIds.length === 0) return [];
     const { data, error } = await supabase
       .from("weekly_plan_items")
       .select("*, subject:subjects(*)")
-      .eq("weekly_plan_id", plan.id)
+      .in("weekly_plan_id", planIds)
+      .gte("created_at", rangeStart(weekStart))
+      .lte("created_at", rangeEnd(weekEnd))
       .order("trail_number");
     if (error) throw new Error(error.message);
     return (data ?? []) as WeeklyPlanItem[];
@@ -77,12 +98,17 @@ export const weeklyPlansService = {
       .order("week_start", { ascending: false });
     if (planError) throw new Error(planError.message);
 
+    const planIds = (plans ?? []).map((plan) => plan.id);
+    if (planIds.length === 0) return [];
+
     const result = await Promise.all(
       (plans ?? []).map(async (plan) => {
         const { data: items, error } = await client
           .from("weekly_plan_items")
           .select("*, subject:subjects(*), weekly_plan:weekly_plans(*)")
-          .eq("weekly_plan_id", plan.id)
+          .in("weekly_plan_id", planIds)
+          .gte("created_at", rangeStart(plan.week_start))
+          .lte("created_at", rangeEnd(plan.week_end))
           .eq("studied", false)
           .order("trail_number");
         if (error) throw new Error(error.message);

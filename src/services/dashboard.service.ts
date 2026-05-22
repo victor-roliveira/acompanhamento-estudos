@@ -1,5 +1,5 @@
-import { calculateAccuracy, formatTrailNumber } from "@/lib/utils";
-import type { DailyStudyLog, DashboardFilter, DashboardSummary, EvolutionPoint, RankingItem } from "@/types/study";
+import { calculateAccuracy, formatTrailNumber, parseIsoDate, toIsoDate } from "@/lib/utils";
+import type { DailyStudyLog, DashboardFilter, DashboardSummary, EvolutionPoint, RankingItem, SubjectTrailEvolution } from "@/types/study";
 
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -10,11 +10,11 @@ function filterLogs(logs: DailyStudyLog[], filter: DashboardFilter) {
   const today = startOfDay(new Date());
   const start = new Date(today);
   if (filter === "daily") {
-    return logs.filter((log) => log.study_date === today.toISOString().slice(0, 10));
+    return logs.filter((log) => log.study_date === toIsoDate(today));
   }
   if (filter === "weekly") start.setDate(today.getDate() - 6);
   if (filter === "monthly") start.setMonth(today.getMonth() - 1);
-  return logs.filter((log) => new Date(`${log.study_date}T00:00:00`) >= start);
+  return logs.filter((log) => parseIsoDate(log.study_date) >= start);
 }
 
 function groupRanking(logs: DailyStudyLog[], getLabel: (log: DailyStudyLog) => string): RankingItem[] {
@@ -32,7 +32,7 @@ function groupRanking(logs: DailyStudyLog[], getLabel: (log: DailyStudyLog) => s
 
 function buildEvolution(logs: DailyStudyLog[], filter: DashboardFilter): EvolutionPoint[] {
   const grouped = logs.reduce<Record<string, EvolutionPoint>>((acc, log) => {
-    const date = new Date(`${log.study_date}T00:00:00`);
+    const date = parseIsoDate(log.study_date);
     const label =
       filter === "monthly"
         ? `${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`
@@ -44,6 +44,27 @@ function buildEvolution(logs: DailyStudyLog[], filter: DashboardFilter): Evoluti
     return acc;
   }, {});
   return Object.values(grouped).reverse();
+}
+
+function buildSubjectTrailEvolution(logs: DailyStudyLog[]): SubjectTrailEvolution[] {
+  const grouped = logs.reduce<Record<string, SubjectTrailEvolution>>((acc, log) => {
+    const subject = log.subject?.name ?? "Sem matéria";
+    const key = `${subject}-${log.trail_number}`;
+    acc[key] ??= {
+      subject,
+      trailLabel: `Trilha ${formatTrailNumber(log.trail_number)}`,
+      trailNumber: log.trail_number,
+      total: 0,
+      correct: 0,
+      accuracy: 0,
+    };
+    acc[key].total += log.total_questions;
+    acc[key].correct += log.correct_questions;
+    acc[key].accuracy = calculateAccuracy(acc[key].correct, acc[key].total);
+    return acc;
+  }, {});
+
+  return Object.values(grouped).sort((a, b) => a.subject.localeCompare(b.subject) || a.trailNumber - b.trailNumber);
 }
 
 export const dashboardService = {
@@ -65,6 +86,7 @@ export const dashboardService = {
       bestSubjects: bySubject.slice(0, 5),
       worstSubjects: [...bySubject].sort((a, b) => a.accuracy - b.accuracy).slice(0, 5),
       evolution: buildEvolution(scoped, filter),
+      subjectTrailEvolution: buildSubjectTrailEvolution(scoped),
     };
   },
 };

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Award, Check, Percent, X } from "lucide-react";
+import { Award, Check, Percent, TrendingUp, X } from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useStudyLogs } from "@/hooks/useStudyLogs";
 import { cn, performanceClass, performanceLabel } from "@/lib/utils";
-import type { DashboardFilter, RankingItem } from "@/types/study";
+import type { DashboardFilter, RankingItem, SubjectTrailEvolution } from "@/types/study";
 
 const filters: Array<{ value: DashboardFilter; label: string }> = [
   { value: "general", label: "Geral" },
@@ -36,6 +36,62 @@ function RankingList({ title, items }: { title: string; items: RankingItem[] }) 
             <Progress value={item.accuracy} />
           </div>
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SubjectTrailEvolutionList({ items }: { items: SubjectTrailEvolution[] }) {
+  const grouped = useMemo(() => {
+    return items.reduce<Record<string, SubjectTrailEvolution[]>>((acc, item) => {
+      acc[item.subject] ??= [];
+      acc[item.subject].push(item);
+      acc[item.subject].sort((a, b) => a.trailNumber - b.trailNumber);
+      return acc;
+    }, {});
+  }, [items]);
+
+  const subjects = Object.entries(grouped);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Evolução por matéria e trilha</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {subjects.length === 0 && <p className="text-sm text-muted-foreground">Sem dados no filtro atual.</p>}
+        {subjects.map(([subject, trailItems]) => {
+          const first = trailItems[0]?.accuracy ?? 0;
+          const last = trailItems[trailItems.length - 1]?.accuracy ?? 0;
+          const delta = Number((last - first).toFixed(2));
+
+          return (
+            <div key={subject} className="rounded-md border border-border bg-muted p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-bold">{subject}</p>
+                  <p className="text-xs text-muted-foreground">{trailItems.length} trilha(s) registradas</p>
+                </div>
+                <Badge className={cn(delta >= 0 ? "bg-emerald-500 text-white" : "bg-red-600 text-white")}>
+                  <TrendingUp className="mr-1 h-3 w-3" />
+                  {delta >= 0 ? "+" : ""}
+                  {delta}%
+                </Badge>
+              </div>
+              <div className="h-36">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trailItems}>
+                    <CartesianGrid stroke="#294150" strokeDasharray="3 3" />
+                    <XAxis dataKey="trailLabel" stroke="#9bb4bd" fontSize={11} />
+                    <YAxis stroke="#9bb4bd" fontSize={11} domain={[0, 100]} />
+                    <Tooltip contentStyle={{ background: "#162331", border: "1px solid #294150", borderRadius: 8 }} />
+                    <Line type="monotone" dataKey="accuracy" stroke="#86efac" strokeWidth={3} dot={{ r: 4, fill: "#86efac" }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
@@ -119,6 +175,8 @@ export function DashboardPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      <SubjectTrailEvolutionList items={summary.subjectTrailEvolution} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <RankingList title="Melhores matérias" items={summary.bestSubjects} />

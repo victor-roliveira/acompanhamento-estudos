@@ -68,6 +68,15 @@ export type EvolutionPoint = {
   accuracy: number;
 };
 
+export type SubjectTrailEvolution = {
+  subject: string;
+  trailLabel: string;
+  trailNumber: number;
+  total: number;
+  correct: number;
+  accuracy: number;
+};
+
 export type DashboardSummary = {
   totalQuestions: number;
   correctQuestions: number;
@@ -78,6 +87,7 @@ export type DashboardSummary = {
   bestSubjects: RankingItem[];
   worstSubjects: RankingItem[];
   evolution: EvolutionPoint[];
+  subjectTrailEvolution: SubjectTrailEvolution[];
 };
 
 export type StudyLogInput = {

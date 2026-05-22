@@ -41,19 +41,19 @@ export const studyLogsService = {
       .single();
     if (error) throw new Error(error.message);
 
-    const { data: plan } = await supabase
+    const { data: plans } = await supabase
       .from("weekly_plans")
       .select("id")
       .eq("user_id", userId)
       .lte("week_start", input.study_date)
-      .gte("week_end", input.study_date)
-      .maybeSingle();
+      .gte("week_end", input.study_date);
 
-    if (plan) {
+    const planIds = (plans ?? []).map((plan) => plan.id);
+    if (planIds.length > 0) {
       await supabase
         .from("weekly_plan_items")
         .update({ studied: true })
-        .eq("weekly_plan_id", plan.id)
+        .in("weekly_plan_id", planIds)
         .eq("subject_id", input.subject_id)
         .eq("trail_number", input.trail_number);
     }
