@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 218 36% 8%;
+    --foreground: 210 25% 96%;
+    --card: 214 35% 13%;
+    --card-foreground: 210 25% 96%;
+    --popover: 214 35% 12%;
+    --popover-foreground: 210 25% 96%;
+    --primary: 210 25% 96%;
+    --primary-foreground: 218 36% 8%;
+    --secondary: 222 38% 24%;
+    --secondary-foreground: 185 47% 94%;
+    --muted: 214 32% 18%;
+    --muted-foreground: 188 17% 71%;
+    --accent: 262 64% 55%;
+    --accent-foreground: 270 44% 97%;
+    --destructive: 348 75% 56%;
+    --destructive-foreground: 350 100% 98%;
+    --border: 203 26% 23%;
+    --input: 205 28% 20%;
+    --ring: 210 25% 96%;
+    --success: 145 63% 42%;
+    --warning: 38 92% 55%;
+    --info: 199 89% 48%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply bg-background text-foreground;
+  }
+
+  body {
+    @apply min-h-screen bg-background font-sans antialiased;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5.75rem);
+  }
+
+  .tap-target {
+    min-height: 2.75rem;
+  }
+}
